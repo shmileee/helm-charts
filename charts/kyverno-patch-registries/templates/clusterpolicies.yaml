@@ -1,0 +1,60 @@
+{{- range $registry, $config := $.Values.registriesToOverwrite }}
+{{- $_ := set $.Values "registry" $registry -}}
+{{- $_ := set $.Values "config" $config -}}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: patch-{{ $registry | replace "." "-" }}-image-registry
+  annotations:
+    policies.kyverno.io/title: "Patch Image Registry '{{ $registry }}'"
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Mutate pods in namespaces labeled with `pull-through-enabled: "true"` so
+      that pulls from '{{ $registry }}' are directed to the ECR registry with
+      pull through cache enabled.
+spec:
+  background: false
+  rules:
+    - name: patch-image-registry-pod
+      {{- include "image.matchSelector" $ | nindent 6 }}
+      mutate:
+        foreach:
+          - list: "request.object.spec.containers || []"
+            preconditions:
+              all:
+                - key: "{{`{{ images.containers.\"{{ element.name }}\".registry }}`}}"
+                  operator: Equals
+                  value: {{ $registry }}
+            {{- include "image.mutation.context" $ | nindent 12 }}
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{`{{ element.name }}`}}"
+                    image: "{{`{{ finalImage }}`}}"
+          - list: "request.object.spec.initContainers || []"
+            preconditions:
+              all:
+                - key: "{{`{{ images.initContainers.\"{{ element.name }}\".registry }}`}}"
+                  operator: Equals
+                  value: {{ $registry }}
+            {{- include "image.mutation.context" $ | nindent 12 }}
+            patchStrategicMerge:
+              spec:
+                initContainers:
+                  - name: "{{`{{ element.name }}`}}"
+                    image: "{{`{{ finalImage }}`}}"
+          - list: "request.object.spec.ephemeralContainers || []"
+            preconditions:
+              all:
+                - key: "{{`{{ images.ephemeralContainers.\"{{ element.name }}\".registry }}`}}"
+                  operator: Equals
+                  value: {{ $registry }}
+            {{- include "image.mutation.context" $ | nindent 12 }}
+            patchStrategicMerge:
+              spec:
+                ephemeralContainers:
+                  - name: "{{`{{ element.name }}`}}"
+                    image: "{{`{{ finalImage }}`}}"
+---
+{{- end }}

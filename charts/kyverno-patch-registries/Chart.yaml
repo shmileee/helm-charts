@@ -1,0 +1,9 @@
+apiVersion: v2
+name: kyverno-patch-registries
+description: |
+  A Helm chart for creating Kyverno policies that mutate pods in namespaces
+  labeled with a custom label so that pulls from '{{ $registry }}' are directed
+  to the ECR registry with pull through cache enabled.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
